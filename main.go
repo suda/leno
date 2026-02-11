@@ -3,51 +3,46 @@ package main
 import (
 	"bufio"
 	"embed"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"sync"
-
-	"github.com/gorilla/websocket"
 )
 
 //go:embed all:public
 var publicFS embed.FS
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
-
 type hub struct {
 	mu      sync.Mutex
-	clients map[*websocket.Conn]struct{}
+	clients map[chan string]struct{}
 }
 
 func newHub() *hub {
-	return &hub{clients: make(map[*websocket.Conn]struct{})}
+	return &hub{clients: make(map[chan string]struct{})}
 }
 
-func (h *hub) add(c *websocket.Conn) {
+func (h *hub) add(ch chan string) {
 	h.mu.Lock()
-	h.clients[c] = struct{}{}
+	h.clients[ch] = struct{}{}
 	h.mu.Unlock()
 }
 
-func (h *hub) remove(c *websocket.Conn) {
+func (h *hub) remove(ch chan string) {
 	h.mu.Lock()
-	delete(h.clients, c)
+	delete(h.clients, ch)
 	h.mu.Unlock()
-	c.Close()
+	close(ch)
 }
 
 func (h *hub) broadcast(line string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	for c := range h.clients {
-		if err := c.WriteMessage(websocket.TextMessage, []byte(line)); err != nil {
-			delete(h.clients, c)
-			c.Close()
+	for ch := range h.clients {
+		select {
+		case ch <- line:
+		default:
 		}
 	}
 }
@@ -73,21 +68,29 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		conn, err := upgrader.Upgrade(w, r, nil)
-		if err != nil {
-			log.Printf("ws upgrade error: %v", err)
-			return
-		}
-		h.add(conn)
-		go func() {
-			defer h.remove(conn)
-			for {
-				if _, _, err := conn.ReadMessage(); err != nil {
-					break
+	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+
+		ch := make(chan string, 16)
+		h.add(ch)
+		defer h.remove(ch)
+
+		for {
+			select {
+			case line, ok := <-ch:
+				if !ok {
+					return
 				}
+				fmt.Fprintf(w, "data: %s\n\n", line)
+				if f, ok := w.(http.Flusher); ok {
+					f.Flush()
+				}
+			case <-r.Context().Done():
+				return
 			}
-		}()
+		}
 	})
 	mux.Handle("/", http.FileServer(http.FS(sub)))
 
