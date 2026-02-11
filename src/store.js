@@ -2,7 +2,8 @@ import { writable } from 'svelte/store';
 
 const messageStore = writable('');
 
-const socket = new WebSocket('ws://localhost:3000');
+const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+const socket = new WebSocket(`${protocol}//${location.host}/ws`);
 
 // Listen for messages
 socket.addEventListener('message', function (event) {

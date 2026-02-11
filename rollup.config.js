@@ -6,8 +6,6 @@ import { terser } from 'rollup-plugin-terser';
 import css from 'rollup-plugin-css-only';
 import sveltePreprocess from "svelte-preprocess";
 
-const { createServer } = require( './server');
-
 const production = !process.env.ROLLUP_WATCH;
 
 const preprocess = sveltePreprocess({
@@ -25,17 +23,6 @@ const preprocess = sveltePreprocess({
 		],
 	},
 });
-
-function serve() {
-	let server;
-
-	return {
-		writeBundle() {
-			if (server) return;
-			server = createServer();
-		}
-	};
-}
 
 export default {
 	input: 'src/main.js',
@@ -67,10 +54,6 @@ export default {
 			dedupe: ['svelte']
 		}),
 		commonjs(),
-
-		// In dev mode, call `npm run start` once
-		// the bundle has been generated
-		!production && serve(),
 
 		// Watch the `public` directory and refresh the
 		// browser on changes when not in production
