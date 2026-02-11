@@ -97,8 +97,7 @@
 			const lowerSearch = searchTerm.toLowerCase();
 			const matchesSearch = keys.some(
 				(key) =>
-					key in currentMessage &&
-					String(currentMessage[key]).toLowerCase().includes(lowerSearch)
+					key in currentMessage && String(currentMessage[key]).toLowerCase().includes(lowerSearch)
 			);
 			if (!matchesSearch) return false;
 		}
@@ -174,6 +173,25 @@
 				return 'outline';
 		}
 	}
+
+	function getLevelClass(level: string): string {
+		switch (level) {
+			case 'error':
+			case 'fatal':
+				return 'bg-destructive/8 hover:bg-destructive/15 border-l-2 border-l-destructive/50';
+			case 'warn':
+			case 'warning':
+				return 'bg-yellow-500/8 hover:bg-yellow-500/15 border-l-2 border-l-yellow-500/50';
+			case 'info':
+				return 'bg-sky-500/8 hover:bg-sky-500/15 border-l-2 border-l-sky-500/40';
+			case 'debug':
+				return 'bg-violet-500/8 hover:bg-violet-500/15 border-l-2 border-l-violet-500/40';
+			case 'trace':
+				return 'bg-cyan-500/8 hover:bg-cyan-500/15 border-l-2 border-l-cyan-500/40';
+			default:
+				return 'hover:bg-muted/50';
+		}
+	}
 </script>
 
 <div class="flex h-screen w-full overflow-hidden bg-background">
@@ -194,7 +212,7 @@
 	{:else}
 		<button
 			onclick={() => (sidebarVisible = true)}
-			class="flex h-full w-8 shrink-0 items-start justify-center border-r border-border bg-card pt-3 text-muted-foreground hover:text-foreground"
+			class="flex h-full w-9 shrink-0 items-start justify-center border-r border-border bg-sidebar pt-[17px] text-sidebar-foreground/40 hover:text-sidebar-foreground transition-colors"
 			title="Show sidebar"
 		>
 			<svg
@@ -213,58 +231,158 @@
 	{/if}
 
 	<!-- Main content -->
-	<main class="flex-1 overflow-auto">
-		<Table.Root>
-			<Table.Header class="sticky top-0 z-10 bg-muted/80 backdrop-blur">
-				<Table.Row>
-					{#each keys as key}
-						{#if visibleKeys[key]}
-							<Table.Head class="whitespace-nowrap">{key}</Table.Head>
-						{/if}
-					{/each}
-				</Table.Row>
-			</Table.Header>
-			<Table.Body>
-				{#each filteredMessages as message, i}
-					{@const level = String(message.level ?? '').toLowerCase()}
-					<Table.Row
-						class={level === 'error' || level === 'fatal'
-							? 'bg-destructive/10 hover:bg-destructive/20'
-							: level === 'warn' || level === 'warning'
-								? 'bg-yellow-500/10 hover:bg-yellow-500/20'
-								: level === 'info'
-									? 'bg-sky-500/15 hover:bg-sky-500/25'
-									: level === 'debug'
-										? 'bg-violet-500/20 hover:bg-violet-500/30'
-										: level === 'trace'
-											? 'bg-cyan-500/10 hover:bg-cyan-500/20'
-											: i % 2 === 0
-												? 'bg-muted/30'
-												: ''}
+	<div class="flex flex-1 flex-col overflow-hidden">
+		<!-- Top bar -->
+		<header
+			class="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-4"
+		>
+			<div class="flex items-center gap-3">
+				<div class="flex items-center gap-1.5">
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="h-4 w-4 text-muted-foreground"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
 					>
-						{#each keys as key}
-							{#if visibleKeys[key]}
-								<Table.Cell class="text-sm">
-									{#if key === 'level' && message[key] !== undefined}
-										<Badge variant={getLevelVariant(message[key])}>
-											{message[key]}
-										</Badge>
-									{:else if message[key] !== undefined}
-										{message[key]}
-									{/if}
-								</Table.Cell>
+						<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+						<polyline points="14 2 14 8 20 8" />
+						<line x1="16" y1="13" x2="8" y2="13" />
+						<line x1="16" y1="17" x2="8" y2="17" />
+						<polyline points="10 9 9 9 8 9" />
+					</svg>
+					<h1 class="text-sm font-medium">Log Stream</h1>
+				</div>
+				{#if messages.length > 0}
+					<div class="flex items-center gap-1.5 rounded-md bg-muted/60 px-2 py-0.5">
+						<div class="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></div>
+						<span class="text-xs text-muted-foreground font-mono">
+							{filteredMessages.length.toLocaleString()}
+							{#if filteredMessages.length !== messages.length}
+								<span class="text-muted-foreground/50">/ {messages.length.toLocaleString()}</span>
 							{/if}
-						{/each}
-					</Table.Row>
-				{/each}
-			</Table.Body>
-		</Table.Root>
-
-		{#if messages.length === 0}
-			<div class="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
-				<p class="text-lg">Waiting for log messages...</p>
-				<p class="text-sm">Pipe JSON logs to this process to get started.</p>
+						</span>
+					</div>
+				{/if}
 			</div>
-		{/if}
-	</main>
+			{#if searchTerm || Object.keys(fieldFilters).length > 0}
+				<div class="flex items-center gap-2 text-xs text-muted-foreground">
+					{#if searchTerm}
+						<span class="flex items-center gap-1 rounded-md bg-muted px-2 py-0.5">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-3 w-3"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+							</svg>
+							"{searchTerm}"
+						</span>
+					{/if}
+					{#if Object.keys(fieldFilters).length > 0}
+						<span class="flex items-center gap-1 rounded-md bg-muted px-2 py-0.5">
+							<svg
+								xmlns="http://www.w3.org/2000/svg"
+								class="h-3 w-3"
+								viewBox="0 0 24 24"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-linecap="round"
+								stroke-linejoin="round"
+							>
+								<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+							</svg>
+							{Object.keys(fieldFilters).length} filter{Object.keys(fieldFilters).length !== 1
+								? 's'
+								: ''}
+						</span>
+					{/if}
+				</div>
+			{/if}
+		</header>
+
+		<!-- Table area -->
+		<main class="flex-1 overflow-auto">
+			{#if messages.length === 0}
+				<div class="flex h-full flex-col items-center justify-center gap-4 text-muted-foreground">
+					<div class="flex h-12 w-12 items-center justify-center rounded-xl bg-muted">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-6 w-6 text-muted-foreground/60"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+							stroke-linecap="round"
+							stroke-linejoin="round"
+						>
+							<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+							<polyline points="14 2 14 8 20 8" />
+							<line x1="16" y1="13" x2="8" y2="13" />
+							<line x1="16" y1="17" x2="8" y2="17" />
+							<polyline points="10 9 9 9 8 9" />
+						</svg>
+					</div>
+					<div class="text-center">
+						<p class="text-sm font-medium text-foreground">Waiting for log messages</p>
+						<p class="mt-1 text-xs text-muted-foreground">
+							Pipe JSON logs to this process to get started
+						</p>
+					</div>
+					<div class="rounded-md border border-border bg-muted/50 px-3 py-2">
+						<code class="text-xs font-mono text-muted-foreground">./myapp | leno</code>
+					</div>
+				</div>
+			{:else}
+				<Table.Root>
+					<Table.Header
+						class="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
+					>
+						<Table.Row class="border-b border-border hover:bg-transparent">
+							{#each keys as key}
+								{#if visibleKeys[key]}
+									<Table.Head
+										class="whitespace-nowrap h-10 text-xs font-medium text-muted-foreground uppercase tracking-wide px-3"
+										>{key}</Table.Head
+									>
+								{/if}
+							{/each}
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each filteredMessages as message}
+							{@const level = String(message.level ?? '').toLowerCase()}
+							<Table.Row class="border-b border-border/50 {getLevelClass(level)} transition-colors">
+								{#each keys as key}
+									{#if visibleKeys[key]}
+										<Table.Cell class="py-1.5 px-3 text-xs font-mono">
+											{#if key === 'level' && message[key] !== undefined}
+												<Badge
+													variant={getLevelVariant(message[key])}
+													class="text-xs font-medium px-1.5 py-0"
+												>
+													{message[key]}
+												</Badge>
+											{:else if message[key] !== undefined}
+												<span class="text-foreground/80">{message[key]}</span>
+											{/if}
+										</Table.Cell>
+									{/if}
+								{/each}
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			{/if}
+		</main>
+	</div>
 </div>
