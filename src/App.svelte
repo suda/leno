@@ -6,6 +6,7 @@
 
 	const STORAGE_KEY = 'leno:visibleKeys';
 	const FILTERS_STORAGE_KEY = 'leno:fieldFilters';
+	const DARK_MODE_KEY = 'leno:darkMode';
 
 	let messages = $state<LogMessage[]>([]);
 	let filteredMessages = $state<LogMessage[]>([]);
@@ -15,6 +16,7 @@
 	);
 	let searchTerm = $state('');
 	let sidebarVisible = $state(true);
+	let darkMode = $state(localStorage.getItem(DARK_MODE_KEY) === 'true');
 	// fieldFilters: map of field name → set of selected values (null means "all")
 	let fieldFilters = $state<Record<string, string[]>>(
 		JSON.parse(localStorage.getItem(FILTERS_STORAGE_KEY) ?? '{}')
@@ -22,6 +24,11 @@
 
 	$effect(() => {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(visibleKeys));
+	});
+
+	$effect(() => {
+		localStorage.setItem(DARK_MODE_KEY, String(darkMode));
+		document.documentElement.classList.toggle('dark', darkMode);
 	});
 
 	$effect(() => {
@@ -133,6 +140,8 @@
 			filteredCount={filteredMessages.length}
 			callbacks={{ applyFilters, selectAll, selectNone, addFilter, removeFilter, getTopValues }}
 			onToggle={() => (sidebarVisible = false)}
+			{darkMode}
+			onToggleDarkMode={() => (darkMode = !darkMode)}
 		/>
 	{:else}
 		<button
@@ -167,9 +176,9 @@
 							: level === 'warn' || level === 'warning'
 								? 'bg-yellow-500/10 hover:bg-yellow-500/20'
 								: level === 'info'
-									? 'bg-blue-500/10 hover:bg-blue-500/20'
+									? 'bg-sky-500/15 hover:bg-sky-500/25'
 									: level === 'debug'
-										? 'bg-violet-500/10 hover:bg-violet-500/20'
+										? 'bg-violet-500/20 hover:bg-violet-500/30'
 										: level === 'trace'
 											? 'bg-cyan-500/10 hover:bg-cyan-500/20'
 											: i % 2 === 0
