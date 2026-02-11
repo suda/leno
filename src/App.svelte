@@ -13,6 +13,7 @@
 		JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
 	);
 	let searchTerm = $state('');
+	let sidebarVisible = $state(true);
 
 	$effect(() => {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(visibleKeys));
@@ -74,14 +75,27 @@
 </script>
 
 <div class="flex h-screen w-full overflow-hidden bg-background">
-	<Sidebar
-		{keys}
-		bind:visibleKeys
-		bind:searchTerm
-		totalMessages={messages.length}
-		filteredCount={filteredMessages.length}
-		callbacks={{ applyFilters, selectAll, selectNone }}
-	/>
+	{#if sidebarVisible}
+		<Sidebar
+			{keys}
+			bind:visibleKeys
+			bind:searchTerm
+			totalMessages={messages.length}
+			filteredCount={filteredMessages.length}
+			callbacks={{ applyFilters, selectAll, selectNone }}
+			onToggle={() => (sidebarVisible = false)}
+		/>
+	{:else}
+		<button
+			onclick={() => (sidebarVisible = true)}
+			class="flex h-full w-8 shrink-0 items-start justify-center border-r border-border bg-card pt-3 text-muted-foreground hover:text-foreground"
+			title="Show sidebar"
+		>
+			<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<polyline points="9 18 15 12 9 6" />
+			</svg>
+		</button>
+	{/if}
 
 	<!-- Main content -->
 	<main class="flex-1 overflow-auto">
