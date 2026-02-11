@@ -3,12 +3,15 @@ package main
 import (
 	"bufio"
 	"embed"
+	"flag"
 	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
 	"sync"
+
+	"github.com/suda/leno/parsers"
 )
 
 var (
@@ -59,12 +62,21 @@ func main() {
 		port = "3000"
 	}
 
+	logFormat := flag.String("log-format", "", "Log format to parse (nginx)")
+	flag.Parse()
+
 	h := newHub()
 
 	go func() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
-			h.broadcast(scanner.Text())
+			line := scanner.Text()
+			if *logFormat == "nginx" {
+				if parsed, ok := parsers.ParseNginx(line); ok {
+					line = parsed
+				}
+			}
+			h.broadcast(line)
 		}
 	}()
 

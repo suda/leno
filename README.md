@@ -10,7 +10,7 @@
 	<br>
 </div>
 
-Leño is a [JSON lines](https://jsonlines.org/) log viewer with a web UI. Think of it as local Kibana/Sumo Logic for development. Works great with [Pino](https://getpino.io/) logging library or any other app that logs into JSON.
+Leño is a [JSON lines](https://jsonlines.org/) log viewer with a web UI. Think of it as local Kibana/Sumo Logic for development. Works great with [Pino](https://getpino.io/) logging library, any other app that logs into JSON, or nginx/nginx-ingress access logs.
 
 ![](./assets/screenshot.png)
 
@@ -52,6 +52,43 @@ Leno running on http://localhost:8080
 ```sh
 $ node server.js | leno
 ```
+
+### Nginx / nginx-ingress access logs
+
+Use `--log-format=nginx` to parse nginx access logs (both the standard [combined log format](https://nginx.org/en/docs/http/ngx_http_log_module.html) and the extended [nginx-ingress format](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/log-format/)). Each line is converted to a JSON object before display.
+
+```sh
+# Local nginx
+$ tail -f /var/log/nginx/access.log | leno --log-format=nginx
+
+# Kubernetes nginx-ingress
+$ kubectl logs -n nginx -l app.kubernetes.io/name=ingress-nginx \
+    --all-containers=true -f | leno --log-format=nginx
+```
+
+The following fields are extracted:
+
+| Field | Type | Description |
+|---|---|---|
+| `remote_addr` | string | Client IP address |
+| `remote_user` | string | Authenticated user (`-` if none) |
+| `time` | string | Request time in RFC 3339 UTC |
+| `method` | string | HTTP method |
+| `path` | string | Request path |
+| `http_version` | string | HTTP version |
+| `status` | number | HTTP response status code |
+| `body_bytes` | number | Bytes sent to client |
+| `http_referer` | string | `Referer` header |
+| `http_user_agent` | string | `User-Agent` header |
+| `request_length` | number | *(nginx-ingress)* Request size in bytes |
+| `request_time` | number | *(nginx-ingress)* Request processing time in seconds |
+| `upstream_name` | string | *(nginx-ingress)* Upstream service name |
+| `upstream_addr` | string | *(nginx-ingress)* Upstream pod address |
+| `upstream_response_time` | string | *(nginx-ingress)* Upstream response time(s) |
+| `upstream_status` | number | *(nginx-ingress)* Upstream response status code |
+| `request_id` | string | *(nginx-ingress)* Unique request ID |
+
+Lines that don't match either format are passed through as-is, so mixed log streams (e.g. nginx error lines alongside access lines) are handled gracefully.
 
 ### Generate fake logs for testing
 
