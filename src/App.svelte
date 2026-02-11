@@ -7,10 +7,12 @@
 	const STORAGE_KEY = 'leno:visibleKeys';
 	const FILTERS_STORAGE_KEY = 'leno:fieldFilters';
 	const DARK_MODE_KEY = 'leno:darkMode';
+	const MAX_DISPLAY = 2000;
 
 	let messages = $state<LogMessage[]>([]);
 	let filteredMessages = $state<LogMessage[]>([]);
 	let keys = $state<string[]>([]);
+	let keysSet = new Set<string>();
 	let visibleKeys = $state<Record<string, boolean>>(
 		JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')
 	);
@@ -35,22 +37,16 @@
 		localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(fieldFilters));
 	});
 
-	function addKeys(newKeys: string[]) {
-		keys = [...new Set([...keys, ...newKeys])];
-		for (const key of keys) {
-			if (!(key in visibleKeys)) visibleKeys[key] = true;
+	// Memoized top values: recomputes when messages array or fieldFilters keys change
+	const topValuesCache = $derived.by(() => {
+		const result: Record<string, string[]> = {};
+		for (const field of Object.keys(fieldFilters)) {
+			result[field] = computeTopValues(field);
 		}
-	}
+		return result;
+	});
 
-	function selectAll() {
-		for (const key of keys) visibleKeys[key] = true;
-	}
-
-	function selectNone() {
-		for (const key of keys) visibleKeys[key] = false;
-	}
-
-	function getTopValues(field: string): string[] {
+	function computeTopValues(field: string): string[] {
 		const counts = new Map<string, number>();
 		for (const msg of messages) {
 			if (field in msg && msg[field] !== undefined) {
@@ -65,9 +61,27 @@
 			.map(([val]) => val);
 	}
 
+	function addKeys(newKeys: string[]) {
+		for (const k of newKeys) {
+			if (!keysSet.has(k)) {
+				keysSet.add(k);
+				keys.push(k);
+			}
+			if (!(k in visibleKeys)) visibleKeys[k] = true;
+		}
+	}
+
+	function selectAll() {
+		for (const key of keys) visibleKeys[key] = true;
+	}
+
+	function selectNone() {
+		for (const key of keys) visibleKeys[key] = false;
+	}
+
 	function addFilter(field: string) {
 		if (field in fieldFilters) return;
-		const topValues = getTopValues(field);
+		const topValues = computeTopValues(field);
 		fieldFilters = { ...fieldFilters, [field]: topValues };
 		applyFilters();
 	}
@@ -80,10 +94,11 @@
 
 	function filterMessage(currentMessage: LogMessage): boolean {
 		if (searchTerm !== '') {
+			const lowerSearch = searchTerm.toLowerCase();
 			const matchesSearch = keys.some(
 				(key) =>
 					key in currentMessage &&
-					String(currentMessage[key]).toLowerCase().includes(searchTerm.toLowerCase())
+					String(currentMessage[key]).toLowerCase().includes(lowerSearch)
 			);
 			if (!matchesSearch) return false;
 		}
@@ -98,21 +113,53 @@
 		return true;
 	}
 
-	function processMessage(currentMessage: LogMessage | null) {
+	// RAF batching: buffer messages and flush at most once per animation frame
+	let pendingMessages: LogMessage[] = [];
+	let rafPending = false;
+
+	function scheduleFlush() {
+		if (rafPending) return;
+		rafPending = true;
+		requestAnimationFrame(() => {
+			rafPending = false;
+			const batch = pendingMessages.splice(0);
+			if (batch.length === 0) return;
+
+			for (const msg of batch) {
+				addKeys(Object.keys(msg));
+			}
+
+			// Prepend batch to messages in one mutation
+			messages.unshift(...batch);
+
+			// Prepend matching messages to filteredMessages in one mutation
+			const matching = batch.filter(filterMessage);
+			if (matching.length > 0) {
+				filteredMessages.unshift(...matching);
+				// Trim to display cap
+				if (filteredMessages.length > MAX_DISPLAY) {
+					filteredMessages.length = MAX_DISPLAY;
+				}
+			}
+		});
+	}
+
+	function queueMessage(currentMessage: LogMessage | null) {
 		if (!currentMessage) return;
-		messages = [currentMessage, ...messages];
-		addKeys(Object.keys(currentMessage));
-		if (filterMessage(currentMessage)) {
-			filteredMessages = [currentMessage, ...filteredMessages];
-		}
+		pendingMessages.push(currentMessage);
+		scheduleFlush();
 	}
 
 	function applyFilters() {
-		filteredMessages = messages.filter(filterMessage);
+		const result = messages.filter(filterMessage);
+		// Replace array contents in place to avoid signal identity change triggering full reconcile
+		filteredMessages.length = 0;
+		const capped = result.slice(0, MAX_DISPLAY);
+		filteredMessages.push(...capped);
 	}
 
 	$effect(() => {
-		return store.subscribe(processMessage);
+		return store.subscribe(queueMessage);
 	});
 
 	function getLevelVariant(level: unknown): 'default' | 'destructive' | 'secondary' | 'outline' {
@@ -133,13 +180,13 @@
 	{#if sidebarVisible}
 		<Sidebar
 			{keys}
-			{messages}
 			bind:visibleKeys
 			bind:searchTerm
 			bind:fieldFilters
+			{topValuesCache}
 			totalMessages={messages.length}
 			filteredCount={filteredMessages.length}
-			callbacks={{ applyFilters, selectAll, selectNone, addFilter, removeFilter, getTopValues }}
+			callbacks={{ applyFilters, selectAll, selectNone, addFilter, removeFilter }}
 			onToggle={() => (sidebarVisible = false)}
 			{darkMode}
 			onToggleDarkMode={() => (darkMode = !darkMode)}

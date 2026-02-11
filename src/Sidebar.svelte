@@ -1,14 +1,13 @@
 <script lang="ts">
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
-	import type { LogMessage } from './store.js';
 
 	interface Props {
 		keys: string[];
-		messages: LogMessage[];
 		visibleKeys: Record<string, boolean>;
 		searchTerm: string;
 		fieldFilters: Record<string, string[]>;
+		topValuesCache: Record<string, string[]>;
 		totalMessages: number;
 		filteredCount: number;
 		callbacks: {
@@ -17,7 +16,6 @@
 			selectNone: () => void;
 			addFilter: (field: string) => void;
 			removeFilter: (field: string) => void;
-			getTopValues: (field: string) => string[];
 		};
 		onToggle: () => void;
 		darkMode: boolean;
@@ -26,10 +24,10 @@
 
 	let {
 		keys,
-		messages: _messages,
 		visibleKeys = $bindable(),
 		searchTerm = $bindable(),
 		fieldFilters = $bindable(),
+		topValuesCache,
 		totalMessages,
 		filteredCount,
 		callbacks,
@@ -54,17 +52,13 @@
 	}
 
 	function selectAllValues(field: string) {
-		fieldFilters = { ...fieldFilters, [field]: callbacks.getTopValues(field) };
+		fieldFilters = { ...fieldFilters, [field]: topValuesCache[field] ?? [] };
 		callbacks.applyFilters();
 	}
 
 	function selectNoneValues(field: string) {
 		fieldFilters = { ...fieldFilters, [field]: [] };
 		callbacks.applyFilters();
-	}
-
-	function getAvailableValues(field: string): string[] {
-		return callbacks.getTopValues(field);
 	}
 </script>
 
@@ -229,7 +223,7 @@
 		<div class="flex flex-col gap-2">
 			<p class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Filters</p>
 			{#each Object.entries(fieldFilters) as [field, selectedValues]}
-				{@const availableValues = getAvailableValues(field)}
+				{@const availableValues = topValuesCache[field] ?? []}
 				<div class="rounded-md border border-border bg-background p-2 flex flex-col gap-1.5">
 					<div class="flex items-center justify-between">
 						<span class="text-xs font-medium">{field}</span>
