@@ -112,14 +112,22 @@
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
-				{#each filteredMessages as message}
+				{#each filteredMessages as message, i}
 					{@const level = String(message.level ?? '').toLowerCase()}
 					<Table.Row
 						class={level === 'error' || level === 'fatal'
 							? 'bg-destructive/10 hover:bg-destructive/20'
 							: level === 'warn' || level === 'warning'
 								? 'bg-yellow-500/10 hover:bg-yellow-500/20'
-								: ''}
+								: level === 'info'
+									? 'bg-blue-500/10 hover:bg-blue-500/20'
+									: level === 'debug'
+										? 'bg-violet-500/10 hover:bg-violet-500/20'
+										: level === 'trace'
+											? 'bg-cyan-500/10 hover:bg-cyan-500/20'
+											: i % 2 === 0
+												? 'bg-muted/30'
+												: ''}
 					>
 						{#each keys as key}
 							{#if visibleKeys[key]}
