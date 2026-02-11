@@ -1,33 +1,65 @@
 <script lang="ts">
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
+	import type { LogMessage } from './store.js';
 
 	interface Props {
 		keys: string[];
+		messages: LogMessage[];
 		visibleKeys: Record<string, boolean>;
 		searchTerm: string;
+		fieldFilters: Record<string, string[]>;
 		totalMessages: number;
 		filteredCount: number;
 		callbacks: {
 			applyFilters: () => void;
 			selectAll: () => void;
 			selectNone: () => void;
+			addFilter: (field: string) => void;
+			removeFilter: (field: string) => void;
+			getTopValues: (field: string) => string[];
 		};
 		onToggle: () => void;
 	}
 
 	let {
 		keys,
+		messages,
 		visibleKeys = $bindable(),
 		searchTerm = $bindable(),
+		fieldFilters = $bindable(),
 		totalMessages,
 		filteredCount,
 		callbacks,
 		onToggle,
 	}: Props = $props();
+
+	function toggleFilterValue(field: string, value: string) {
+		const current = fieldFilters[field] ?? [];
+		if (current.includes(value)) {
+			fieldFilters = { ...fieldFilters, [field]: current.filter((v) => v !== value) };
+		} else {
+			fieldFilters = { ...fieldFilters, [field]: [...current, value] };
+		}
+		callbacks.applyFilters();
+	}
+
+	function selectAllValues(field: string) {
+		fieldFilters = { ...fieldFilters, [field]: callbacks.getTopValues(field) };
+		callbacks.applyFilters();
+	}
+
+	function selectNoneValues(field: string) {
+		fieldFilters = { ...fieldFilters, [field]: [] };
+		callbacks.applyFilters();
+	}
+
+	function getAvailableValues(field: string): string[] {
+		return callbacks.getTopValues(field);
+	}
 </script>
 
-<aside class="flex w-64 shrink-0 flex-col gap-4 border-r border-border bg-card p-4">
+<aside class="flex w-64 shrink-0 flex-col gap-4 border-r border-border bg-card p-4 overflow-y-auto">
 	<div class="flex items-center justify-between">
 		<div class="flex items-center gap-2">
 			<svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-foreground" viewBox="0 0 64 64" fill="currentColor">
@@ -67,10 +99,76 @@
 				</div>
 			</div>
 			{#each keys as key}
-				<label class="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
-					<Checkbox bind:checked={visibleKeys[key]} />
-					<span class="text-sm">{key}</span>
-				</label>
+				<div class="group flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
+					<label class="flex flex-1 cursor-pointer items-center gap-2">
+						<Checkbox bind:checked={visibleKeys[key]} />
+						<span class="text-sm">{key}</span>
+					</label>
+					{#if !(key in fieldFilters)}
+						<button
+							onclick={() => callbacks.addFilter(key)}
+							class="invisible shrink-0 text-muted-foreground hover:text-foreground group-hover:visible"
+							title="Add filter for {key}"
+						>
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+							</svg>
+						</button>
+					{:else}
+						<span class="shrink-0 text-primary" title="Filter active">
+							<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+								<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+							</svg>
+						</span>
+					{/if}
+				</div>
+			{/each}
+		</div>
+	{/if}
+
+	{#if Object.keys(fieldFilters).length > 0}
+		<div class="flex flex-col gap-2">
+			<p class="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Filters</p>
+			{#each Object.entries(fieldFilters) as [field, selectedValues]}
+				{@const availableValues = getAvailableValues(field)}
+				<div class="rounded-md border border-border bg-background p-2 flex flex-col gap-1.5">
+					<div class="flex items-center justify-between">
+						<span class="text-xs font-medium">{field}</span>
+						<div class="flex items-center gap-1.5">
+							<button
+								onclick={() => selectAllValues(field)}
+								class="text-xs text-muted-foreground hover:text-foreground"
+							>All</button>
+							<span class="text-xs text-muted-foreground">/</span>
+							<button
+								onclick={() => selectNoneValues(field)}
+								class="text-xs text-muted-foreground hover:text-foreground"
+							>None</button>
+							<button
+								onclick={() => callbacks.removeFilter(field)}
+								class="ml-1 text-muted-foreground hover:text-destructive"
+								title="Remove filter"
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+									<line x1="18" y1="6" x2="6" y2="18"/>
+									<line x1="6" y1="6" x2="18" y2="18"/>
+								</svg>
+							</button>
+						</div>
+					</div>
+					{#each availableValues as value}
+						<label class="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-accent">
+							<Checkbox
+								checked={selectedValues.includes(value)}
+								onCheckedChange={() => toggleFilterValue(field, value)}
+							/>
+							<span class="text-xs truncate" title={value}>{value}</span>
+						</label>
+					{/each}
+					{#if availableValues.length === 0}
+						<p class="text-xs text-muted-foreground italic">No values yet</p>
+					{/if}
+				</div>
 			{/each}
 		</div>
 	{/if}

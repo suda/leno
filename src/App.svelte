@@ -5,6 +5,7 @@
 	import Sidebar from './Sidebar.svelte';
 
 	const STORAGE_KEY = 'leno:visibleKeys';
+	const FILTERS_STORAGE_KEY = 'leno:fieldFilters';
 
 	let messages = $state<LogMessage[]>([]);
 	let filteredMessages = $state<LogMessage[]>([]);
@@ -14,9 +15,17 @@
 	);
 	let searchTerm = $state('');
 	let sidebarVisible = $state(true);
+	// fieldFilters: map of field name → set of selected values (null means "all")
+	let fieldFilters = $state<Record<string, string[]>>(
+		JSON.parse(localStorage.getItem(FILTERS_STORAGE_KEY) ?? '{}')
+	);
 
 	$effect(() => {
 		localStorage.setItem(STORAGE_KEY, JSON.stringify(visibleKeys));
+	});
+
+	$effect(() => {
+		localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(fieldFilters));
 	});
 
 	function addKeys(newKeys: string[]) {
@@ -34,13 +43,51 @@
 		for (const key of keys) visibleKeys[key] = false;
 	}
 
+	function getTopValues(field: string): string[] {
+		const counts = new Map<string, number>();
+		for (const msg of messages) {
+			if (field in msg && msg[field] !== undefined) {
+				const val = String(msg[field]);
+				if (val.trim() === '') continue;
+				counts.set(val, (counts.get(val) ?? 0) + 1);
+			}
+		}
+		return [...counts.entries()]
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, 5)
+			.map(([val]) => val);
+	}
+
+	function addFilter(field: string) {
+		if (field in fieldFilters) return;
+		const topValues = getTopValues(field);
+		fieldFilters = { ...fieldFilters, [field]: topValues };
+		applyFilters();
+	}
+
+	function removeFilter(field: string) {
+		const { [field]: _, ...rest } = fieldFilters;
+		fieldFilters = rest;
+		applyFilters();
+	}
+
 	function filterMessage(currentMessage: LogMessage): boolean {
-		if (searchTerm === '') return true;
-		return keys.some(
-			(key) =>
-				key in currentMessage &&
-				String(currentMessage[key]).toLowerCase().includes(searchTerm.toLowerCase())
-		);
+		if (searchTerm !== '') {
+			const matchesSearch = keys.some(
+				(key) =>
+					key in currentMessage &&
+					String(currentMessage[key]).toLowerCase().includes(searchTerm.toLowerCase())
+			);
+			if (!matchesSearch) return false;
+		}
+
+		for (const [field, selectedValues] of Object.entries(fieldFilters)) {
+			if (selectedValues.length === 0) continue;
+			const msgVal = currentMessage[field] !== undefined ? String(currentMessage[field]) : undefined;
+			if (msgVal === undefined || !selectedValues.includes(msgVal)) return false;
+		}
+
+		return true;
 	}
 
 	function processMessage(currentMessage: LogMessage | null) {
@@ -78,11 +125,13 @@
 	{#if sidebarVisible}
 		<Sidebar
 			{keys}
+			{messages}
 			bind:visibleKeys
 			bind:searchTerm
+			bind:fieldFilters
 			totalMessages={messages.length}
 			filteredCount={filteredMessages.length}
-			callbacks={{ applyFilters, selectAll, selectNone }}
+			callbacks={{ applyFilters, selectAll, selectNone, addFilter, removeFilter, getTopValues }}
 			onToggle={() => (sidebarVisible = false)}
 		/>
 	{:else}
