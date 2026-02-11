@@ -38,6 +38,9 @@
 		onToggleDarkMode,
 	}: Props = $props();
 
+	let version = $state('');
+	fetch('/version').then(r => r.text()).then(v => version = v);
+
 	function toggleFilterValue(field: string, value: string) {
 		const current = fieldFilters[field] ?? [];
 		if (current.includes(value)) {
@@ -191,7 +194,16 @@
 		</div>
 	{/if}
 
-	<div class="mt-auto text-xs text-muted-foreground">
-		{filteredCount} / {totalMessages} messages
+	<div class="mt-auto flex flex-col gap-1">
+		<div class="text-xs text-muted-foreground">
+			{filteredCount} / {totalMessages} messages
+		</div>
+		{#if version}
+			<div class="flex items-center gap-1.5 text-xs text-muted-foreground">
+				<span>v{version}</span>
+				<span>·</span>
+				<a href="https://github.com/suda/leno" target="_blank" rel="noopener noreferrer" class="hover:text-foreground">GitHub</a>
+			</div>
+		{/if}
 	</div>
 </aside>
