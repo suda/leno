@@ -73,7 +73,7 @@
 	}
 
 	function removeFilter(field: string) {
-		const { [field]: _, ...rest } = fieldFilters;
+		const { [field]: _removed, ...rest } = fieldFilters;
 		fieldFilters = rest;
 		applyFilters();
 	}
@@ -90,7 +90,8 @@
 
 		for (const [field, selectedValues] of Object.entries(fieldFilters)) {
 			if (selectedValues.length === 0) continue;
-			const msgVal = currentMessage[field] !== undefined ? String(currentMessage[field]) : undefined;
+			const msgVal =
+				currentMessage[field] !== undefined ? String(currentMessage[field]) : undefined;
 			if (msgVal === undefined || !selectedValues.includes(msgVal)) return false;
 		}
 
@@ -149,7 +150,16 @@
 			class="flex h-full w-8 shrink-0 items-start justify-center border-r border-border bg-card pt-3 text-muted-foreground hover:text-foreground"
 			title="Show sidebar"
 		>
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				class="h-4 w-4"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
 				<polyline points="9 18 15 12 9 6" />
 			</svg>
 		</button>

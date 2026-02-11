@@ -10,7 +10,7 @@
 	<br>
 </div>
 
-Leño is a [ndjson](http://ndjson.org/) log viewer with a web UI. Think of it as local Kibana/Sumo Logic for development. Works great with [Pino](https://getpino.io/) logging library or any other app that logs into JSON.
+Leño is a [JSON lines](https://jsonlines.org/) log viewer with a web UI. Think of it as local Kibana/Sumo Logic for development. Works great with [Pino](https://getpino.io/) logging library or any other app that logs into JSON.
 
 ![](./assets/screenshot.png)
 
