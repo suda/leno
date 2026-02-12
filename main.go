@@ -62,7 +62,7 @@ func main() {
 		port = "3000"
 	}
 
-	logFormat := flag.String("log-format", "", "Log format to parse (nginx)")
+	logFormat := flag.String("log-format", "", "Log format to parse (nginx, logfmt)")
 	flag.Parse()
 
 	h := newHub()
@@ -71,8 +71,13 @@ func main() {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
 			line := scanner.Text()
-			if *logFormat == "nginx" {
+			switch *logFormat {
+			case "nginx":
 				if parsed, ok := parsers.ParseNginx(line); ok {
+					line = parsed
+				}
+			case "logfmt":
+				if parsed, ok := parsers.ParseLogfmt(line); ok {
 					line = parsed
 				}
 			}

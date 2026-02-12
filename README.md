@@ -10,7 +10,7 @@
 	<br>
 </div>
 
-Leño is a [JSON lines](https://jsonlines.org/) log viewer with a web UI. Think of it as local Kibana/Sumo Logic for development. Works great with [Pino](https://getpino.io/) logging library, any other app that logs into JSON, or nginx/nginx-ingress access logs.
+Leño is a [JSON lines](https://jsonlines.org/) log viewer with a web UI. Think of it as local Kibana/Sumo Logic for development. Works great with [Pino](https://getpino.io/) logging library, any other app that logs into JSON, nginx/nginx-ingress access logs, or [logfmt](https://brandur.org/logfmt) structured logs.
 
 ![](./assets/screenshot.png)
 
@@ -89,6 +89,16 @@ The following fields are extracted:
 | `request_id` | string | *(nginx-ingress)* Unique request ID |
 
 Lines that don't match either format are passed through as-is, so mixed log streams (e.g. nginx error lines alongside access lines) are handled gracefully.
+
+### logfmt logs
+
+Use `--log-format=logfmt` to parse [logfmt](https://brandur.org/logfmt) logs — a simple `key=value` format used by many Go and Ruby libraries (e.g. [logrus](https://github.com/sirupsen/logrus), [log/slog](https://pkg.go.dev/log/slog) with a text handler, [Heroku router logs](https://devcenter.heroku.com/articles/http-routing#heroku-router-log-format)).
+
+```sh
+$ ./myapp | leno --log-format=logfmt
+```
+
+Each line is parsed into a JSON object. String values that look like integers, floats, or booleans (`true`/`false`) are coerced to the appropriate type. Lines that contain no valid `key=value` pairs are passed through as-is.
 
 ### Generate fake logs for testing
 
